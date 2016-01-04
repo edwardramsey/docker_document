@@ -7,7 +7,6 @@
 #define SHMSZ     27
 
 int shm_wr() {
-    char c;
     int shmid;
     key_t key;
     char *shm, *s;
@@ -25,8 +24,10 @@ int shm_wr() {
     }
 
     s = shm;
-    for (c = 'a'; c <= 'z'; c++)
+    for (char c = 'a'; c <= 'z'; c++)
+	{
         *s++ = c;
+	}
     s = NULL;
 
     return 0;

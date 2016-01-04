@@ -19,7 +19,7 @@ if [ $? -eq 0 ]; then
 	docker rm `docker ps -a|grep container|awk '{print $1}'`
 
 	docker run -d --name "$C1" container1:v1 /bin/$C1
-	docker run -ti --net=host --name "$C1" container2:v1 /bin/$C2
+	docker run -ti --net=host --name "$C2" container2:v1 /bin/$C2
 
 else
 	echo "compile error"

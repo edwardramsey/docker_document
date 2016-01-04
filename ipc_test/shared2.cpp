@@ -6,7 +6,6 @@
 #define SHMSZ     27
 
 int shm_rd() {
-    char c;
     int shmid;
     key_t key;
     char *shm, *s;
@@ -24,9 +23,11 @@ int shm_rd() {
 
     s = shm;
 
-    int i = 0;
-    for (i = 0; i < SHMSZ-1; i++)
+    for (int i = 0; i < SHMSZ-1; i++)
+	{
         printf("%c ", *(s+i));
+	}
+
     printf("\n");
     s = NULL;
 
