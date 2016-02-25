@@ -4,11 +4,11 @@
 #include <iostream>
 #include <map>
 #include <curl/curl.h>
+#include <sstream>
+#include <stdexcept>
 #include "./rapidjson/include/rapidjson/document.h"
 using namespace std;
 
-namespace etcd
-{
 
 int parseJason(const string& str_json, map<string, string>& mapKv);
 
@@ -23,33 +23,48 @@ public:
 	int init();
 
 	/*
+	 * @brief
 	 * Etcd Set 操作
 	 * 
 	 * @param
 	 * ttl 若为0，则为永久节点，若不为0则为临时节点，存在时间为ttl秒
+	 * 
+	 * @return
+	 * 设置成功返回0， 不成功返回-1
 	 */
 	int Set(const string& key, const string& value, int ttl = 0);
 
 	/*
+	 * @brief
 	 * Etcd Get 操作
 	 * 
-	 * @return 返回key对应的值
-	 * 若为目录，则返回"this is a dir"
+	 * @return 
+	 * 返回key对应的值，若为目录，则返回空
 	 */
 	string Get(const string& key);
 
 	// int Mkdir();
 	
 	/*
-	 * Etcd 递归地列出目录下所有key
+	 * @brief
+	 * Etcd 递归地列出目录下所有key，key可以不是目录
+	 * 
+	 * @param
+	 * mapKv 结果保存在mapKv中
 	 *
+	 * @return
+	 * 成功返回0，不成功返回-1
 	 */
 	int ListDir(const string& key, map<string, string>& mapKv);
 
+	/*
+	 * @brief
+	 * Etcd 删除节点
+	 */
 	int Delete(const string& key);
 
 protected:
-	string curl_func(const string& strurl, const string& str_type = "");
+	string curl_func(const string& strurl, const char* c_type);
 
 private:
 	CURL*  			m_curlHandler;
@@ -68,6 +83,8 @@ public:
 	{
 		
 	}
+
+	virtual ~CurlException() throw() {}
 
     virtual const char* what() const throw() {
         ostringstream estr;
@@ -92,6 +109,8 @@ public:
 
 	}
 
+	virtual ~ParseException() throw() {}
+
 	virtual const char* what() const throw()
 	{
 		return msg.c_str();
@@ -101,5 +120,4 @@ private:
 	string 			msg;
 };
 
-}
 #endif

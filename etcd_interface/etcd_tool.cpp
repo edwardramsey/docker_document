@@ -24,6 +24,8 @@ Client::Client(const string& ip, const int port)
 	ostringstream url;
 	url << "http://" << ip << ":" << port << "/v2/keys"; 
 	m_url_key = url.str();
+
+	init_handler();
 }
 
 int Client::init()
@@ -86,27 +88,44 @@ int Client::Set(const string& key, const string& value, int ttl)
 	catch(const exception &e)
 	{
 		cout << e.what() << endl;	
+		return -1;
 	}
+
+	return 0;
 }
 
 int Client::ListDir(const string& key, map<string, string>& mapKv)
 {
 	try
 	{
-		string str_jason = curl_func(m_url_key + key + "?recursive=true");	
-		parseJason(str_jason, mapKv, "GET");
+		string str_jason = curl_func(m_url_key + key + "?recursive=true", "GET");	
+		parseJason(str_jason, mapKv);
 	}
 	catch(const exception &e)
 	{
 		cout << e.what() << endl;	
+		return -1;
 	}
 
 	return 0;
 }
 
+int Client::Delete(const string& key)
+{
+	try
+	{
+		string str_jason = curl_func(m_url_key + key, "DELETE");
+	}
+	catch(const exception &e)
+	{
+		cout << e.what() << endl;
+		return -1;
+	}
 
+	return 0;
+}
 
-string Client::curl_func(const string& str_url, const string& str_type)
+string Client::curl_func(const string& str_url, const char* c_type)
 {
 	/*
 	 * curl_easy_setopt 参数:
@@ -116,7 +135,7 @@ string Client::curl_func(const string& str_url, const string& str_type)
     string result;
 	CURLcode code;
 
-	code = curl_easy_setopt(m_curlHandler, CURLOPT_CUSTOMREQUEST, str_type);
+	code = curl_easy_setopt(m_curlHandler, CURLOPT_CUSTOMREQUEST, c_type);
 	_checkError(code, "set request type");
 
     code = curl_easy_setopt(m_curlHandler, CURLOPT_URL, str_url.c_str());
@@ -150,7 +169,8 @@ int parseJason(const string& str_json, map<string, string>& mapKv)
 	dc.Parse(str_json.c_str());
 	if(dc.HasMember("errorCode"))
 	{
-		throw ParseException("request error" + string(dc["message"].GetString()) + dc["cause"].GetString());
+		throw ParseException("request error: message" + 
+				string(dc["message"].GetString()) + dc["cause"].GetString());
 	}
 	else
 	{

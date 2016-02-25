@@ -7,11 +7,13 @@ int main()
 	cout << c.Get("/compose_test/1_2_3/ipc") << endl;
     cout << c.Get("/compose_test/1_2_3") << endl;
 
+	c.Delete("/compose_test/1_2_3/614");
+
     c.Set("/compose_test/1_2_3/ipc", "host2");
 
     cout << c.Get("/compose_test/1_2_3/ipc") << endl;
 
-	cout << "list a directory" << endl;
+	cout << "====== list a directory =========" << endl;
     map<string, string> mp;
     c.ListDir("/compose_test/1_2_3", mp);
     map<string, string>::iterator it = mp.begin();
@@ -20,14 +22,14 @@ int main()
         cout << it->first << ", " << it->second << endl;
     }
 
+	cout << "======== list key not exist ========" << endl;
 	mp.clear();
-
 	c.ListDir("/compose_test/1_2_22", mp);
 
-	cout << "list single key" << endl;
+	cout << "======== list single key ==========" << endl;
 	mp.clear();
 	c.ListDir("/compose_test/1_2_3/ipc", mp);
-	map<string, string>::iterator it = mp.begin();
+	it = mp.begin();
     for(; it != mp.end(); ++it)
     {
         cout << it->first << ", " << it->second << endl;
