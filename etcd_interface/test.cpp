@@ -1,17 +1,38 @@
 #include "etcd_tool.h"
 
+void compare(const string& a, const string& b)
+{
+	cout << (a == b ? "OK" : "Failed") << endl;
+}
+
+
 int main()
 {
 	Client c("10.1.245.157", 2379);
 
+	// Get key and Get dir
 	cout << c.Get("/compose_test/1_2_3/ipc") << endl;
+	cout << c.Get("/compose_test/1_2_3/ipc123123") << endl;
     cout << c.Get("/compose_test/1_2_3") << endl;
 
-	c.Delete("/compose_test/1_2_3/614");
+	// Set value
+	c.Set("/test_etcd/kaka", "kaka");
+    cout << compare(c.Get("/test_etcd/kaka"), "kaka") << endl;
+	// Set 路径错误
+	c.Set("/test_etcd//kaka", "kaka");
+	// 重复Set
+	c.Set("/test_etcd/kaka", "kaka");
+	c.Set("/test_etcd/kaka", "ppp");
 
-    c.Set("/compose_test/1_2_3/ipc", "host2");
-
-    cout << c.Get("/compose_test/1_2_3/ipc") << endl;
+	// Delete key/not exist / Delete dir/not exist
+	c.Set("/test_etcd/ppp", 123);
+	int ret = c.Delete("/test_etcd/ppp");
+	cout << ret << endl;
+	ret = c.Delete("/test_etcd/ppp");
+	cout << ret << endl;
+	c.Set("/test_etcd/ppp", 123);
+	ret = c.Delete("/test_etcd");
+	cout << ret << endl;
 
 	cout << "====== list a directory =========" << endl;
     map<string, string> mp;
@@ -34,4 +55,7 @@ int main()
     {
         cout << it->first << ", " << it->second << endl;
     }
+
+	Client c1("110.1.245.157", 2379);
+	c1.Get("/dasd");
 }

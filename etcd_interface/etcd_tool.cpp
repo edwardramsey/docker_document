@@ -1,9 +1,9 @@
 #include "etcd_tool.h"
-#include "./rapidjson/include/rapidjson/document.h"
 
 #define    ETCD_DIR    	1
 #define    ETCD_VAL		2
 
+// curl的回调函数
 size_t callback_write_func(void *ptr, size_t size, size_t nmemb, void *stream) 
 {
     string data((const char*) ptr, (size_t)size * nmemb);
@@ -19,43 +19,73 @@ void _checkError(CURLcode& code, const string& str_err)
 	}
 }
 
-Client::Client(const string& ip, const int port)
-{
-	ostringstream url;
-	url << "http://" << ip << ":" << port << "/v2/keys"; 
-	m_url_key = url.str();
-
-	init_handler();
-}
-
-int Client::init()
+CCurl::CCurl(const string& ip, const int port)
 {
 	curl_global_init(CURL_GLOBAL_ALL);
-	m_curlHandler = curl_easy_init();
-	if(!m_curlHandler)
+	m_handler = curl_easy_init();
+	if(!m_handler)
 	{
 		cout << "curl handle init error" << endl;
-		return -1;
 	}
 
-	return 0;
+	ostringstream url;
+	url << "http://" << ip << ":" << port << "/v2/keys"; 
+	m_basic_url = url.str();
 }
 
-Client::~Client()
+CCurl::~CCurl()
 {
-	if(!m_curlHandler)
+	if(m_handler)
 	{
-		curl_easy_cleanup(m_curlHandler);
+		curl_easy_cleanup(m_handler);
 	}
 }
+
+
+string CCurl::curl_func(const string& key, 
+					const char* c_req_type, 
+					const string& option)
+{
+	/*
+	 * curl_easy_setopt 参数:
+	 *		CURLOPT_WRITEFUNCTION 	需要的回调函数
+	 *		CURLOPT_WRITEDATA  		获取的结果是第四个参数中的内容
+	*/
+    string result;
+	CURLcode code;
+
+	if(0 == strcmp(c_req_type, "PUT"))
+	{
+		curl_easy_setopt(m_handler, CURLOPT_POST, 1);
+		curl_easy_setopt(m_handler, CURLOPT_COPYPOSTFIELDS, option.c_str());
+	}
+
+	code = curl_easy_setopt(m_handler, CURLOPT_CUSTOMREQUEST, c_req_type);
+	_checkError(code, "set request type");
+
+    code = curl_easy_setopt(m_handler, CURLOPT_URL, (m_basic_url + key).c_str());
+	_checkError(code, "set url");
+    
+	code = curl_easy_setopt(m_handler, CURLOPT_WRITEFUNCTION, &callback_write_func);
+	_checkError(code, "set write callback function");
+
+    code = curl_easy_setopt(m_handler, CURLOPT_WRITEDATA, &result);
+	_checkError(code, "set result target");
+
+    code = curl_easy_perform(m_handler);
+	_checkError(code, "curl perform");
+
+	return result;
+}
+
 
 string Client::Get(const string& key)
 {
 	try
 	{
-		string str_jason = curl_func(m_url_key + key, "GET");	
+		string str_json = m_Curl.curl_func(key, "GET");	
 		map<string, string> mapKv;
-		int ret = parseJason(str_jason, mapKv);
+		int ret = parseJson(str_json, mapKv);
 		if(ret == ETCD_VAL)
 		{
 			return mapKv[key];
@@ -73,17 +103,15 @@ int Client::Set(const string& key, const string& value, int ttl)
 {
 	try
 	{
-		string buffer = "value=" + value;	
+		string op_cmd = "value=" + value;	
 		if(ttl != 0)
 		{
 			ostringstream s;
 			s << "&ttl=" << ttl;
-			buffer += s.str(); 
+			op_cmd += s.str(); 
 		}
 
-		curl_easy_setopt(m_curlHandler, CURLOPT_POST, 1);
-		curl_easy_setopt(m_curlHandler, CURLOPT_COPYPOSTFIELDS, buffer.c_str());
-		curl_func(m_url_key + key, "PUT");
+		m_Curl.curl_func(key, "PUT", op_cmd);
 	}	
 	catch(const exception &e)
 	{
@@ -98,8 +126,8 @@ int Client::ListDir(const string& key, map<string, string>& mapKv)
 {
 	try
 	{
-		string str_jason = curl_func(m_url_key + key + "?recursive=true", "GET");	
-		parseJason(str_jason, mapKv);
+		string str_json = m_Curl.curl_func(key + "?recursive=true", "GET");	
+		parseJson(str_json, mapKv);
 	}
 	catch(const exception &e)
 	{
@@ -114,7 +142,10 @@ int Client::Delete(const string& key)
 {
 	try
 	{
-		string str_jason = curl_func(m_url_key + key, "DELETE");
+		string str_json = m_Curl.curl_func(key + "?recursive=true", "DELETE");
+		cout << str_json << endl;
+		map<string, string> mapKv;
+		parseJson(str_json, mapKv);
 	}
 	catch(const exception &e)
 	{
@@ -125,38 +156,12 @@ int Client::Delete(const string& key)
 	return 0;
 }
 
-string Client::curl_func(const string& str_url, const char* c_type)
-{
-	/*
-	 * curl_easy_setopt 参数:
-	 *		CURLOPT_WRITEFUNCTION 	需要的回调函数
-	 *		CURLOPT_WRITEDATA  		获取的结果是第四个参数中的内容
-	*/
-    string result;
-	CURLcode code;
 
-	code = curl_easy_setopt(m_curlHandler, CURLOPT_CUSTOMREQUEST, c_type);
-	_checkError(code, "set request type");
-
-    code = curl_easy_setopt(m_curlHandler, CURLOPT_URL, str_url.c_str());
-	_checkError(code, "set url");
-    
-	code = curl_easy_setopt(m_curlHandler, CURLOPT_WRITEFUNCTION, &callback_write_func);
-	_checkError(code, "set write callback function");
-
-    code = curl_easy_setopt(m_curlHandler, CURLOPT_WRITEDATA, &result);
-	_checkError(code, "set result target");
-
-    code = curl_easy_perform(m_curlHandler);
-	_checkError(code, "curl perform");
-
-	return result;
-}
 
 /*
- * 解第一遍jason，将值从返回的jason串中解析出来
+ * 解第一遍json，将值从返回的json串中解析出来
  */
-int parseJason(const string& str_json, map<string, string>& mapKv)
+int parseJson(const string& str_json, map<string, string>& mapKv)
 {
 	/* 
 	 * 错误的格式
@@ -167,21 +172,26 @@ int parseJason(const string& str_json, map<string, string>& mapKv)
 
 	rapidjson::Document dc;	
 	dc.Parse(str_json.c_str());
-	if(dc.HasMember("errorCode"))
+
+	if(dc.IsObject())
 	{
-		throw ParseException("request error: message" + 
-				string(dc["message"].GetString()) + dc["cause"].GetString());
-	}
-	else
-	{
-		if(dc.HasMember("node"))
+		if(dc.HasMember("errorCode"))
 		{
-			return parseJasonObject(dc["node"], mapKv);
+			throw ParseException(dc["errorCode"].GetInt(),
+					"request error: message[" + string(dc["message"].GetString()) 
+					+ string("] cause:") + dc["cause"].GetString());
 		}
 		else
 		{
-			throw ParseException("unknown exception");
+			if(dc.HasMember("node") && 0 == strcmp(dc["action"].GetString(), "get"))
+			{
+				return parseJsonObject(dc["node"], mapKv);
+			}
 		}
+	}
+	else
+	{
+		throw ParseException(1, "usefuless json, content: " + str_json);
 	}
 
 }
@@ -191,18 +201,16 @@ int parseJason(const string& str_json, map<string, string>& mapKv)
  * 根据获得的object判断是目录dir还是值value
  * 如果是目录，递归获得下面的值
  */
-int parseJasonObject(const rapidjson::Value& object, map<string, string>& mapKv)
+int parseJsonObject(const rapidjson::Value& object, map<string, string>& mapKv)
 {
 	int dir_flag = ETCD_VAL;
 	if(object.HasMember("dir") && true == object["dir"].GetBool())
 	{
 		if(object.HasMember("nodes"))
 		{
-			// Value::ConstMemberIterator itObj = object.MemberBegin();
-			// for ( #<{(| ;itObj != object.MemberEnd(); ++itOb |)}>#j)
 			for(size_t i = 0; i < object["nodes"].Size(); ++i)
 			{
-				parseJasonObject(object["nodes"][i], mapKv);
+				parseJsonObject(object["nodes"][i], mapKv);
 			}
 		}
 
